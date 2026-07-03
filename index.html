@@ -160,9 +160,9 @@
     <h2><span class="num">1</span>길이 입력 — 아무 형식이나</h2>
     <div class="fields">
       <div class="field">
-        <label for="convInput">피트-인치 분수, 소수, mm 다 됩니다</label>
+        <label for="convInput">ft 모드에선 기호(&#39; &quot;) 없이 띄어쓰기만 해도 됩니다</label>
         <div class="inbox">
-          <input id="convInput" type="text" autocomplete="off" spellcheck="false" placeholder='예: 21&#39; 11 1/8&quot;'>
+          <input id="convInput" type="text" autocomplete="off" spellcheck="false" placeholder='예: 21 11 1/8  (= 21&#39; 11 1/8&quot;)'>
         </div>
       </div>
     </div>
@@ -346,6 +346,19 @@
     s = s.replace(/,/g, "");
     s = s.replace(/[″“”]/g, '"').replace(/[′‘’`]/g, "'");
     s = s.replace(/(feet|ft)\.?/gi, "'").replace(/(inches|inch|in)\.?/gi, '"');
+    // ft 해석 모드: 기호 없이 "21 11 1/8" 처럼 띄어쓰기(또는 -)만 한 입력도 피트-인치로 인식
+    if (convAssume === "ft" && s.indexOf("'") === -1 && s.indexOf('"') === -1 && /^[\d.\s\/-]+$/.test(s)) {
+      var t = s.match(/^(\d+(?:\.\d+)?)(?:[\s-]+(?:(\d+(?:\.\d+)?)[\s-]+)?(\d+)\s*\/\s*(\d+)|[\s-]+(\d+(?:\.\d+)?))?$/);
+      if (t && (t[2] !== undefined || t[3] !== undefined || t[5] !== undefined)) {
+        var fIn = t[3] !== undefined
+          ? (t[2] !== undefined ? parseFloat(t[2]) : 0) + parseInt(t[3], 10) / parseInt(t[4], 10)
+          : parseFloat(t[5]);
+        var fTxt = t[3] !== undefined
+          ? (t[2] !== undefined ? t[2] + " " : "") + t[3] + "/" + t[4]
+          : t[5];
+        return { inches: parseFloat(t[1]) * 12 + fIn, read: t[1] + "피트 " + fTxt + "인치 (기호 없이 입력됨)" };
+      }
+    }
     var m;
     if ((m = s.match(/^(\d+(?:\.\d+)?)\s*mm$/i)))
       return { inches: parseFloat(m[1]) / 25.4, read: fmt(parseFloat(m[1]), 2) + " mm" };
@@ -396,7 +409,7 @@
       $("subGrid").innerHTML = "";
       lastCopyText = "";
       note.textContent = rawIn.trim()
-        ? '입력을 이해하지 못했어요. 예: 21\' 11 1/8"  ·  21.93\'  ·  135.44  ·  6683mm'
+        ? '입력을 이해하지 못했어요. 예: 21 11 1/8  ·  21.93  ·  267 3/8"  ·  6683mm'
         : "위에 길이를 입력하면 모든 단위로 한 번에 변환됩니다.";
       return;
     }
@@ -679,7 +692,7 @@
     });
   });
   // 변환 탭 예시 버튼 — 눌러보면 형식을 바로 이해할 수 있게
-  ['21\' 11 1/8"', '21.93\'', '267 3/8"', '6683 mm'].forEach(function (ex) {
+  ['21 11 1/8', '21.93', '267 3/8"', '6683 mm'].forEach(function (ex) {
     var b = document.createElement("button");
     b.type = "button";
     b.textContent = ex;
