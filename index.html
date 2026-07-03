@@ -326,12 +326,13 @@
           big = toFrac16(rise) + ' <small>(' + fmt(rise, 2) + '″)</small>';
           cells = [
             ["피트-인치로", ftIn(rise)],
+            ["소수 피트로", fmt(rise / 12, 3) + " ft"],
             ["밀리미터로", fmt(rise * 25.4, 1) + " mm"],
             ["경사 각도", fmt(Math.atan2(rise, run) * 180 / Math.PI, 2) + "°"],
             ["경사율", fmt(rise / run * 100, 2) + "%"]
           ];
-          copyText = "경사 " + slopeName() + ", 수평거리 " + ftIn(run) +
-            " → 올릴 높이 " + toFrac16(rise) + " (" + fmt(rise * 25.4, 1) + " mm)";
+          copyText = "경사 " + slopeName() + ", 수평거리 " + ftIn(run) + " (" + fmt(run / 12, 3) + " ft)" +
+            " → 올릴 높이 " + toFrac16(rise) + " (" + fmt(rise / 12, 3) + " ft / " + fmt(rise * 25.4, 1) + " mm)";
         }
       } else {
         var runMm = num("spanMm");
@@ -343,6 +344,7 @@
           cells = [
             ["미터로", fmt(riseMm / 1000, 3) + " m"],
             ["인치로", toFrac16(riseMm / 25.4)],
+            ["소수 피트로", fmt(riseMm / 304.8, 3) + " ft"],
             ["경사 각도", fmt(Math.atan(pct / 100) * 180 / Math.PI, 2) + "°"],
             ["비율로", "1/" + fmt(100 / pct, 0)]
           ];
@@ -368,7 +370,7 @@
           if (Math.abs(Math.round(inPerFt * 16) / 16 - inPerFt) > 0.002) {
             warn = "※ 1피트당 인치 분수 표기는 1/16″ 단위 반올림 값입니다. 정확한 값은 소수(in/ft)를 쓰세요.";
           }
-          copyText = "수평거리 " + ftIn(run2) + ", 높이 " + toFrac16(rise2) +
+          copyText = "수평거리 " + ftIn(run2) + " (" + fmt(run2 / 12, 3) + " ft), 높이 " + toFrac16(rise2) +
             " → 경사 " + fmt(inPerFt, 3) + " in/ft (" + fmt(rise2 / run2 * 100, 2) + "%)";
         }
       } else {
@@ -415,7 +417,7 @@
     var x1 = padL + bw, y1 = y0;                // 오른쪽 아래
     var yTop = y0 - visRise;                    // 오른쪽 위 (높은 쪽)
 
-    var runLabel = unit === "imp" ? ftIn(runIn) : fmt(runIn * 25.4, 0) + " mm";
+    var runLabel = unit === "imp" ? ftIn(runIn) + " (" + fmt(runIn / 12, 3) + " ft)" : fmt(runIn * 25.4, 0) + " mm";
     var riseLabel = unit === "imp" ? toFrac16(riseIn) : fmt(riseIn * 25.4, 1) + " mm";
     var angle = fmt(Math.atan2(riseIn, runIn) * 180 / Math.PI, 2);
 
@@ -440,12 +442,12 @@
     var head, rows;
     if (unit === "imp") {
       var slope = getSlopeImp();
-      head = "<th>수평거리</th><th>올릴 높이 (분수)</th><th>올릴 높이 (소수 in)</th><th>mm</th>";
+      head = "<th>수평거리</th><th>올릴 높이 (분수)</th><th>올릴 높이 (소수 in)</th><th>소수 ft</th><th>mm</th>";
       var spansFt = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
       rows = spansFt.map(function (ft) {
         var rise = ft * slope;
         return "<tr><td>" + ft + "′</td><td>" + toFrac16(rise) + "</td><td>" +
-          fmt(rise, 2) + "</td><td>" + fmt(rise * 25.4, 1) + "</td></tr>";
+          fmt(rise, 2) + "</td><td>" + fmt(rise / 12, 3) + "</td><td>" + fmt(rise * 25.4, 1) + "</td></tr>";
       }).join("");
       $("tblNote").textContent = "현재 선택: " + slopeName() + " — 표는 경사도를 바꾸면 자동으로 갱신됩니다.";
     } else {
