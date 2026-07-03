@@ -144,14 +144,39 @@
   <div class="tabs" role="tablist">
     <button id="tabA" class="on" type="button">높이 구하기<br><span style="font-weight:400;font-size:12px">경사도 + 수평거리</span></button>
     <button id="tabB" type="button">경사도 구하기<br><span style="font-weight:400;font-size:12px">수평거리 + 높이</span></button>
+    <button id="tabC" type="button">단위 변환<br><span style="font-weight:400;font-size:12px">피트-인치 ↔ 소수 ↔ mm</span></button>
   </div>
 
-  <div class="unit-row">
+  <div class="unit-row" id="unitRow">
     <div class="seg" role="group" aria-label="단위 선택">
       <button id="unitImp" class="on" type="button">피트–인치</button>
       <button id="unitMet" type="button">밀리미터</button>
     </div>
     <span class="unit-hint" id="unitHint">미국 프로젝트 기준 (인치/피트)</span>
+  </div>
+
+  <!-- 단위 변환 (모드 C 전용) -->
+  <div class="card hidden" id="convCard">
+    <h2><span class="num">1</span>길이 입력 — 아무 형식이나</h2>
+    <div class="fields">
+      <div class="field">
+        <label for="convInput">피트-인치 분수, 소수, mm 다 됩니다</label>
+        <div class="inbox">
+          <input id="convInput" type="text" autocomplete="off" spellcheck="false" placeholder='예: 21&#39; 11 1/8&quot;'>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+      <span style="font-size:12.5px; color:var(--gray); font-weight:700">숫자만 넣으면 이 단위로 해석:</span>
+      <div class="seg" id="convSeg" role="group" aria-label="기본 해석 단위">
+        <button type="button" data-u="ft" class="on">ft</button>
+        <button type="button" data-u="in">in</button>
+        <button type="button" data-u="mm">mm</button>
+        <button type="button" data-u="m">m</button>
+      </div>
+    </div>
+    <div class="chips" id="convChips" style="margin-top:12px"></div>
+    <p class="chip-note" id="convParsed">위에 길이를 입력하면 모든 단위로 한 번에 변환됩니다.</p>
   </div>
 
   <!-- 경사도 선택 (모드 A 전용) -->
@@ -173,7 +198,7 @@
   </div>
 
   <!-- 거리/높이 입력 -->
-  <div class="card">
+  <div class="card" id="spanCard">
     <h2><span class="num" id="stepNum">2</span><span id="inputTitle">수평거리 입력</span></h2>
 
     <!-- 피트-인치 스팬 -->
@@ -223,13 +248,13 @@
   </div>
 
   <!-- 그림 -->
-  <div class="card diagram">
+  <div class="card diagram" id="diagramCard">
     <h2>단면 그림 <span style="font-weight:400">(경사는 보기 좋게 과장됨)</span></h2>
     <svg id="tri" viewBox="0 0 640 240" role="img" aria-label="경사 단면 삼각형 그림"></svg>
   </div>
 
   <!-- 빠른 참조표 -->
-  <div class="card">
+  <div class="card" id="tableCard">
     <h2>빠른 참조표 — 선택한 경사도 기준</h2>
     <div class="tablebox">
       <table>
@@ -253,6 +278,7 @@
   var slopeInPerFt = 0.5;  // 선택된 경사 (in/ft) — imperial
   var slopePct = 2;        // 선택된 경사 (%) — metric
   var customOn = false;
+  var convAssume = "ft";   // 변환 탭: 단위 표시 없는 숫자를 해석할 단위
 
   // 프리셋: [값, 표기]
   var PRESET_IMP = [
@@ -311,7 +337,85 @@
 
   var lastCopyText = "";
 
+  // ── 단위 변환 파서 ────────────────────
+  // "21' 11 1/8\"", "21'-11 1/8", "11 1/8\"", "3/8\"", "21.93'", "6683mm", "2.5m",
+  // 단위 없는 숫자는 convAssume 단위로 해석. 반환: { inches, read(인식한 값 설명) }
+  function parseLengthToInches(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return null;
+    s = s.replace(/,/g, "");
+    s = s.replace(/[″“”]/g, '"').replace(/[′‘’`]/g, "'");
+    s = s.replace(/(feet|ft)\.?/gi, "'").replace(/(inches|inch|in)\.?/gi, '"');
+    var m;
+    if ((m = s.match(/^(\d+(?:\.\d+)?)\s*mm$/i)))
+      return { inches: parseFloat(m[1]) / 25.4, read: fmt(parseFloat(m[1]), 2) + " mm" };
+    if ((m = s.match(/^(\d+(?:\.\d+)?)\s*cm$/i)))
+      return { inches: parseFloat(m[1]) / 2.54, read: fmt(parseFloat(m[1]), 2) + " cm" };
+    if ((m = s.match(/^(\d+(?:\.\d+)?)\s*m$/i)))
+      return { inches: parseFloat(m[1]) * 1000 / 25.4, read: fmt(parseFloat(m[1]), 3) + " m" };
+
+    // 피트-인치(분수) 형식: [피트'] [인치 정수] [분자/분모] ["]
+    m = s.match(/^(?:(\d+(?:\.\d+)?)\s*')?\s*-?\s*(?:(\d+(?:\.\d+)?)\s+(\d+)\s*\/\s*(\d+)|(\d+)\s*\/\s*(\d+)|(\d+(?:\.\d+)?))?\s*("?)\s*$/);
+    if (!m) return null;
+    var hasFt = m[1] !== undefined;
+    var hasInMark = m[8] === '"';
+    var inch = 0, inchTxt = "", isFrac = false;
+    if (m[2] !== undefined) {
+      inch = parseFloat(m[2]) + parseInt(m[3], 10) / parseInt(m[4], 10);
+      inchTxt = m[2] + " " + m[3] + "/" + m[4]; isFrac = true;
+    } else if (m[5] !== undefined) {
+      inch = parseInt(m[5], 10) / parseInt(m[6], 10);
+      inchTxt = m[5] + "/" + m[6]; isFrac = true;
+    } else if (m[7] !== undefined) {
+      inch = parseFloat(m[7]);
+      inchTxt = m[7];
+    }
+    if (!hasFt && inchTxt === "") return null;
+
+    // 단위 표시가 전혀 없는 순수 숫자 → 선택된 해석 단위 적용
+    if (!hasFt && !hasInMark && !isFrac) {
+      var v = parseFloat(inchTxt);
+      if (convAssume === "ft") return { inches: v * 12, read: fmt(v, 3) + " ft (해석 단위: ft)" };
+      if (convAssume === "in") return { inches: v, read: fmt(v, 3) + " in (해석 단위: in)" };
+      if (convAssume === "mm") return { inches: v / 25.4, read: fmt(v, 1) + " mm (해석 단위: mm)" };
+      return { inches: v * 1000 / 25.4, read: fmt(v, 3) + " m (해석 단위: m)" };
+    }
+    var total = (hasFt ? parseFloat(m[1]) * 12 : 0) + inch;
+    var read = (hasFt ? m[1] + "피트" : "") + (inchTxt ? (hasFt ? " " : "") + inchTxt + "인치" : "");
+    return { inches: total, read: read };
+  }
+
+  function renderConv() {
+    var rawIn = $("convInput").value;
+    var p = parseLengthToInches(rawIn);
+    var note = $("convParsed");
+    var w = $("warn");
+    w.textContent = ""; w.className = "warn";
+    if (!p || isNaN(p.inches) || !(p.inches >= 0)) {
+      $("bigResult").innerHTML = "—";
+      $("subGrid").innerHTML = "";
+      lastCopyText = "";
+      note.textContent = rawIn.trim()
+        ? '입력을 이해하지 못했어요. 예: 21\' 11 1/8"  ·  21.93\'  ·  135.44  ·  6683mm'
+        : "위에 길이를 입력하면 모든 단위로 한 번에 변환됩니다.";
+      return;
+    }
+    var v = p.inches; // 내부 기준: 인치
+    $("bigResult").innerHTML = ftIn(v) + ' <small>= ' + fmt(v / 12, 3) + ' ft</small>';
+    $("subGrid").innerHTML = [
+      ["소수 피트", fmt(v / 12, 3) + " ft"],
+      ["소수 인치", fmt(v, 3) + '″'],
+      ["밀리미터", fmt(v * 25.4, 1) + " mm"],
+      ["미터", fmt(v * 25.4 / 1000, 3) + " m"]
+    ].map(function (c) {
+      return '<div class="cell"><div class="k">' + c[0] + '</div><div class="v">' + c[1] + '</div></div>';
+    }).join("");
+    note.textContent = "인식한 값: " + p.read;
+    lastCopyText = ftIn(v) + " = " + fmt(v / 12, 3) + " ft = " + fmt(v, 2) + " in = " + fmt(v * 25.4, 1) + " mm";
+  }
+
   function render() {
+    if (mode === "C") { renderConv(); return; }
     var big = "—", cells = [], warn = "", copyText = "";
     var runIn = 0, riseInVal = 0; // 그림용 (인치 환산)
 
@@ -510,11 +614,18 @@
     mode = m;
     $("tabA").className = m === "A" ? "on" : "";
     $("tabB").className = m === "B" ? "on" : "";
+    $("tabC").className = m === "C" ? "on" : "";
+    $("unitRow").className = m === "C" ? "unit-row hidden" : "unit-row";
+    $("convCard").className = m === "C" ? "card" : "card hidden";
     $("slopeCard").className = m === "A" ? "card" : "card hidden";
+    $("spanCard").className = m === "C" ? "card hidden" : "card";
+    $("diagramCard").className = m === "C" ? "card diagram hidden" : "card diagram";
+    $("tableCard").className = m === "C" ? "card hidden" : "card";
     $("riseWrap").className = m === "B" ? "" : "hidden";
     $("stepNum").textContent = m === "A" ? "2" : "1";
     $("inputTitle").textContent = m === "A" ? "수평거리 입력" : "수평거리와 높이 입력";
-    $("resultLabel").textContent = m === "A" ? "올려야 하는 높이" : "경사도";
+    $("resultLabel").textContent = m === "A" ? "올려야 하는 높이" : (m === "B" ? "경사도" : "변환 결과");
+    if (m === "C") { $("convInput").focus(); }
     render();
   }
 
@@ -556,6 +667,25 @@
   // ── 이벤트 연결 ───────────────────────
   $("tabA").addEventListener("click", function () { setMode("A"); });
   $("tabB").addEventListener("click", function () { setMode("B"); });
+  $("tabC").addEventListener("click", function () { setMode("C"); });
+  $("convInput").addEventListener("input", render);
+  Array.prototype.forEach.call($("convSeg").querySelectorAll("button"), function (btn) {
+    btn.addEventListener("click", function () {
+      convAssume = btn.getAttribute("data-u");
+      Array.prototype.forEach.call($("convSeg").querySelectorAll("button"), function (b2) {
+        b2.className = b2 === btn ? "on" : "";
+      });
+      render();
+    });
+  });
+  // 변환 탭 예시 버튼 — 눌러보면 형식을 바로 이해할 수 있게
+  ['21\' 11 1/8"', '21.93\'', '267 3/8"', '6683 mm'].forEach(function (ex) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = ex;
+    b.addEventListener("click", function () { $("convInput").value = ex; render(); });
+    $("convChips").appendChild(b);
+  });
   $("unitImp").addEventListener("click", function () { setUnit("imp"); });
   $("unitMet").addEventListener("click", function () { setUnit("met"); });
   ["spanFt", "spanIn", "spanMm", "riseIn", "riseMm", "customSlope"].forEach(function (id) {
