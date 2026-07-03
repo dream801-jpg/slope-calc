@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📐</text></svg>">
+<title>경사도 계산기 — MAP</title>
+<style>
+  :root {
+    --bg: #EEEEEE;
+    --accent: #FFD369;
+    --gray: #393E46;
+    --dark: #222831;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--dark);
+    font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", sans-serif;
+    line-height: 1.55;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 16px 48px; }
+
+  /* ── 헤더 다크바 ─────────────────────── */
+  header {
+    background: var(--dark);
+    color: #EEEEEE;
+    padding: 22px 0 20px;
+    margin-bottom: 20px;
+  }
+  header .wrap { padding-bottom: 0; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.02em; }
+  header h1 .map { color: var(--accent); font-size: 13px; letter-spacing: 0.14em; margin-right: 10px; vertical-align: 2px; }
+  header p { margin: 4px 0 0; font-size: 12.5px; color: #aab0b8; }
+
+  /* ── 모드 탭 ─────────────────────────── */
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tabs button {
+    flex: 1; padding: 12px 8px; font-size: 14.5px; font-weight: 700;
+    font-family: inherit; cursor: pointer; border-radius: 10px;
+    border: 1.5px solid var(--gray); background: var(--card); color: var(--gray);
+  }
+  .tabs button.on { background: var(--dark); color: var(--accent); border-color: var(--dark); }
+  .tabs button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ── 카드 ────────────────────────────── */
+  .card { background: var(--card); border-radius: 14px; padding: 18px 18px 20px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; color: var(--gray); margin: 0 0 12px; letter-spacing: 0.06em; }
+  .card h2 .num { display: inline-block; background: var(--accent); color: var(--dark); border-radius: 6px; padding: 0 7px; margin-right: 7px; font-size: 12px; }
+
+  /* ── 단위 토글 ───────────────────────── */
+  .unit-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .seg { display: inline-flex; border: 1.5px solid var(--gray); border-radius: 9px; overflow: hidden; }
+  .seg button {
+    padding: 7px 16px; font-size: 13px; font-weight: 700; font-family: inherit;
+    border: none; background: var(--card); color: var(--gray); cursor: pointer;
+  }
+  .seg button.on { background: var(--gray); color: #fff; }
+  .seg button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+  .unit-hint { font-size: 12px; color: var(--gray); }
+
+  /* ── 프리셋 칩 ───────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button {
+    padding: 9px 14px; border-radius: 999px; font-size: 14px; font-weight: 700;
+    font-family: inherit; cursor: pointer;
+    border: 1.5px solid #d4d4d4; background: var(--card); color: var(--dark);
+    font-variant-numeric: tabular-nums;
+  }
+  .chips button.on { background: var(--accent); border-color: var(--accent); }
+  .chips button:focus-visible { outline: 3px solid var(--dark); outline-offset: 2px; }
+  .chip-note { font-size: 12px; color: var(--gray); margin-top: 10px; }
+  .chip-note b { color: var(--dark); }
+
+  /* ── 입력 ────────────────────────────── */
+  .fields { display: flex; gap: 10px; flex-wrap: wrap; }
+  .field { flex: 1; min-width: 120px; }
+  .field label { display: block; font-size: 12.5px; color: var(--gray); margin-bottom: 5px; font-weight: 700; }
+  .field .inbox { display: flex; align-items: center; border: 1.5px solid #cfcfcf; border-radius: 10px; background: #fff; overflow: hidden; }
+  .field .inbox:focus-within { border-color: var(--dark); box-shadow: 0 0 0 2px var(--accent); }
+  .field input {
+    width: 100%; border: none; outline: none; padding: 11px 4px 11px 12px;
+    font-size: 17px; font-family: inherit; font-variant-numeric: tabular-nums;
+    color: var(--dark); background: transparent; min-width: 0;
+  }
+  .field .suffix { padding: 0 12px 0 2px; font-size: 13px; color: var(--gray); white-space: nowrap; }
+  .custom-slope { margin-top: 10px; display: none; }
+  .custom-slope.show { display: block; }
+
+  /* ── 결과 ────────────────────────────── */
+  .result { background: var(--dark); color: #EEEEEE; border-radius: 14px; padding: 20px 18px; margin-bottom: 14px; }
+  .result .label { font-size: 12.5px; color: #aab0b8; letter-spacing: 0.06em; }
+  .result .big {
+    font-size: 40px; font-weight: 800; color: var(--accent); line-height: 1.2;
+    font-variant-numeric: tabular-nums; letter-spacing: -0.01em; word-break: keep-all;
+  }
+  .result .big small { font-size: 20px; font-weight: 700; }
+  .subgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 14px; }
+  .subgrid .cell { background: #2d333d; border-radius: 10px; padding: 9px 12px; }
+  .subgrid .cell .k { font-size: 11.5px; color: #aab0b8; }
+  .subgrid .cell .v { font-size: 16px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+  .copybtn {
+    margin-top: 14px; padding: 8px 16px; border-radius: 9px; border: 1.5px solid var(--gray);
+    background: transparent; color: #EEEEEE; font-size: 12.5px; font-family: inherit; cursor: pointer;
+  }
+  .copybtn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .warn { margin-top: 12px; font-size: 12.5px; color: var(--accent); display: none; }
+  .warn.show { display: block; }
+
+  /* ── 그림 ────────────────────────────── */
+  .diagram svg { width: 100%; height: auto; display: block; }
+
+  /* ── 참조표 ──────────────────────────── */
+  .tablebox { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { padding: 8px 10px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th { background: var(--dark); color: var(--accent); font-size: 12px; font-weight: 700; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  tbody tr:nth-child(even) { background: var(--bg); }
+  td { border-bottom: 1px solid #e2e2e2; color: var(--dark); }
+  .tbl-note { font-size: 12px; color: var(--gray); margin-top: 8px; }
+
+  footer { text-align: center; font-size: 12px; color: var(--gray); margin-top: 26px; }
+  footer b { color: var(--dark); }
+
+  .hidden { display: none !important; }
+  @media (max-width: 480px) { .result .big { font-size: 32px; } }
+</style>
+
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1><span class="map">MAP</span>경사도 계산기</h1>
+    <p>경사도·거리·높이 중 두 가지를 알면 나머지를 바로 계산합니다</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="tabs" role="tablist">
+    <button id="tabA" class="on" type="button">높이 구하기<br><span style="font-weight:400;font-size:12px">경사도 + 수평거리</span></button>
+    <button id="tabB" type="button">경사도 구하기<br><span style="font-weight:400;font-size:12px">수평거리 + 높이</span></button>
+  </div>
+
+  <div class="unit-row">
+    <div class="seg" role="group" aria-label="단위 선택">
+      <button id="unitImp" class="on" type="button">피트–인치</button>
+      <button id="unitMet" type="button">밀리미터</button>
+    </div>
+    <span class="unit-hint" id="unitHint">미국 프로젝트 기준 (인치/피트)</span>
+  </div>
+
+  <!-- 경사도 선택 (모드 A 전용) -->
+  <div class="card" id="slopeCard">
+    <h2><span class="num">1</span>경사도 선택</h2>
+    <div class="chips" id="chips"></div>
+    <div class="custom-slope" id="customBox">
+      <div class="fields">
+        <div class="field">
+          <label for="customSlope" id="customLabel">직접 입력 (1피트당 인치)</label>
+          <div class="inbox">
+            <input id="customSlope" type="number" step="any" min="0" placeholder="예: 0.5">
+            <span class="suffix" id="customSuffix">in / ft</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="chip-note" id="chipNote"></p>
+  </div>
+
+  <!-- 거리/높이 입력 -->
+  <div class="card">
+    <h2><span class="num" id="stepNum">2</span><span id="inputTitle">수평거리 입력</span></h2>
+
+    <!-- 피트-인치 스팬 -->
+    <div class="fields" id="spanImp">
+      <div class="field">
+        <label for="spanFt">피트 (ft)</label>
+        <div class="inbox"><input id="spanFt" type="number" step="any" min="0" value="20"><span class="suffix">ft</span></div>
+      </div>
+      <div class="field">
+        <label for="spanIn">인치 (in)</label>
+        <div class="inbox"><input id="spanIn" type="number" step="any" min="0" value="0"><span class="suffix">in</span></div>
+      </div>
+    </div>
+
+    <!-- mm 스팬 -->
+    <div class="fields hidden" id="spanMet">
+      <div class="field">
+        <label for="spanMm">수평거리 (mm)</label>
+        <div class="inbox"><input id="spanMm" type="number" step="any" min="0" value="6000"><span class="suffix">mm</span></div>
+      </div>
+    </div>
+
+    <!-- 높이 입력 (모드 B 전용) -->
+    <div id="riseWrap" class="hidden" style="margin-top:12px">
+      <div class="fields" id="riseImp">
+        <div class="field">
+          <label for="riseIn">올린 높이 (in)</label>
+          <div class="inbox"><input id="riseIn" type="number" step="any" min="0" value="10"><span class="suffix">in</span></div>
+        </div>
+      </div>
+      <div class="fields hidden" id="riseMet">
+        <div class="field">
+          <label for="riseMm">올린 높이 (mm)</label>
+          <div class="inbox"><input id="riseMm" type="number" step="any" min="0" value="120"><span class="suffix">mm</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 결과 -->
+  <div class="result">
+    <div class="label" id="resultLabel">올려야 하는 높이</div>
+    <div class="big" id="bigResult">—</div>
+    <div class="subgrid" id="subGrid"></div>
+    <button class="copybtn" id="copyBtn" type="button">결과 복사</button>
+    <div class="warn" id="warn"></div>
+  </div>
+
+  <!-- 그림 -->
+  <div class="card diagram">
+    <h2>단면 그림 <span style="font-weight:400">(경사는 보기 좋게 과장됨)</span></h2>
+    <svg id="tri" viewBox="0 0 640 240" role="img" aria-label="경사 단면 삼각형 그림"></svg>
+  </div>
+
+  <!-- 빠른 참조표 -->
+  <div class="card">
+    <h2>빠른 참조표 — 선택한 경사도 기준</h2>
+    <div class="tablebox">
+      <table>
+        <thead><tr id="tblHead"></tr></thead>
+        <tbody id="tblBody"></tbody>
+      </table>
+    </div>
+    <p class="tbl-note" id="tblNote"></p>
+  </div>
+
+  <footer>담당: <b>윤드림</b> · 인치 분수는 1/16″ 단위로 반올림해서 표시합니다</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── 상태 ──────────────────────────────
+  var mode = "A";          // A: 높이 구하기, B: 경사도 구하기
+  var unit = "imp";        // imp: ft-in, met: mm
+  var slopeInPerFt = 0.5;  // 선택된 경사 (in/ft) — imperial
+  var slopePct = 2;        // 선택된 경사 (%) — metric
+  var customOn = false;
+
+  // 프리셋: [값, 표기]
+  var PRESET_IMP = [
+    [0.125, '1/8″'], [0.25, '1/4″'], [0.375, '3/8″'],
+    [0.5, '1/2″'], [0.75, '3/4″'], [1, '1″']
+  ];
+  var PRESET_MET = [
+    [0.5, '1/200 (0.5%)'], [1, '1/100 (1%)'], [2, '1/50 (2%)'],
+    [3, '3%'], [5, '5%']
+  ];
+  var DEFAULT_IMP = 0.5, DEFAULT_MET = 2;
+
+  // ── 도우미 ────────────────────────────
+  function $(id) { return document.getElementById(id); }
+  function num(id) { var v = parseFloat($(id).value); return isNaN(v) ? 0 : v; }
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+
+  // 인치를 1/16″ 분수 문자열로 (예: 2.53 → "2 1/2″" … 아니고 2 9/16″ 방식)
+  function toFrac16(inches) {
+    var neg = inches < 0 ? "-" : "";
+    inches = Math.abs(inches);
+    var sixteenths = Math.round(inches * 16);
+    var whole = Math.floor(sixteenths / 16);
+    var rem = sixteenths % 16;
+    if (rem === 0) return neg + whole + '″';
+    var g = gcd(rem, 16);
+    var fr = (rem / g) + "/" + (16 / g);
+    return neg + (whole > 0 ? whole + " " : "") + fr + '″';
+  }
+
+  function fmt(x, d) {
+    if (d === undefined) d = 1;
+    return x.toLocaleString("ko-KR", { maximumFractionDigits: d, minimumFractionDigits: 0 });
+  }
+
+  function ftIn(totalIn) {
+    var ft = Math.floor(totalIn / 12);
+    var rest = totalIn - ft * 12;
+    if (ft === 0) return toFrac16(rest);
+    return ft + "′ " + toFrac16(rest);
+  }
+
+  // ── 계산 ──────────────────────────────
+  function getSpanInches() { return num("spanFt") * 12 + num("spanIn"); }
+  function getSlopeImp() { return customOn ? num("customSlope") : slopeInPerFt; }
+  function getSlopeMet() { return customOn ? num("customSlope") : slopePct; }
+
+  function slopeName() {
+    if (unit === "imp") {
+      var s = getSlopeImp();
+      var hit = PRESET_IMP.filter(function (p) { return p[0] === s; });
+      return (hit.length ? hit[0][1] : fmt(s, 3) + '″') + " / ft";
+    }
+    return fmt(getSlopeMet(), 3) + "%";
+  }
+
+  var lastCopyText = "";
+
+  function render() {
+    var big = "—", cells = [], warn = "", copyText = "";
+    var runIn = 0, riseInVal = 0; // 그림용 (인치 환산)
+
+    if (mode === "A") {
+      // 경사도 + 수평거리 → 높이
+      if (unit === "imp") {
+        var run = getSpanInches();            // in
+        var slope = getSlopeImp();            // in/ft
+        var rise = run / 12 * slope;          // in
+        runIn = run; riseInVal = rise;
+        if (run > 0 && slope > 0) {
+          big = toFrac16(rise) + ' <small>(' + fmt(rise, 2) + '″)</small>';
+          cells = [
+            ["피트-인치로", ftIn(rise)],
+            ["밀리미터로", fmt(rise * 25.4, 1) + " mm"],
+            ["경사 각도", fmt(Math.atan2(rise, run) * 180 / Math.PI, 2) + "°"],
+            ["경사율", fmt(rise / run * 100, 2) + "%"]
+          ];
+          copyText = "경사 " + slopeName() + ", 수평거리 " + ftIn(run) +
+            " → 올릴 높이 " + toFrac16(rise) + " (" + fmt(rise * 25.4, 1) + " mm)";
+        }
+      } else {
+        var runMm = num("spanMm");
+        var pct = getSlopeMet();
+        var riseMm = runMm * pct / 100;
+        runIn = runMm / 25.4; riseInVal = riseMm / 25.4;
+        if (runMm > 0 && pct > 0) {
+          big = fmt(riseMm, 1) + ' mm';
+          cells = [
+            ["미터로", fmt(riseMm / 1000, 3) + " m"],
+            ["인치로", toFrac16(riseMm / 25.4)],
+            ["경사 각도", fmt(Math.atan(pct / 100) * 180 / Math.PI, 2) + "°"],
+            ["비율로", "1/" + fmt(100 / pct, 0)]
+          ];
+          copyText = "경사 " + fmt(pct, 3) + "%, 수평거리 " + fmt(runMm, 0) +
+            " mm → 올릴 높이 " + fmt(riseMm, 1) + " mm";
+        }
+      }
+    } else {
+      // 수평거리 + 높이 → 경사도
+      if (unit === "imp") {
+        var run2 = getSpanInches();
+        var rise2 = num("riseIn");
+        runIn = run2; riseInVal = rise2;
+        if (run2 > 0 && rise2 >= 0) {
+          var inPerFt = rise2 / (run2 / 12);
+          big = toFrac16(inPerFt) + ' <small>/ ft (' + fmt(inPerFt, 3) + ' in/ft)</small>';
+          cells = [
+            ["경사율", fmt(rise2 / run2 * 100, 2) + "%"],
+            ["경사 각도", fmt(Math.atan2(rise2, run2) * 180 / Math.PI, 2) + "°"],
+            ["비율로", rise2 > 0 ? "1/" + fmt(run2 / rise2, 1) : "0"],
+            ["기준 대비", inPerFt >= 0.5 ? "1/2″/ft 이상 ✓" : "1/2″/ft 미만"]
+          ];
+          if (Math.abs(Math.round(inPerFt * 16) / 16 - inPerFt) > 0.002) {
+            warn = "※ 1피트당 인치 분수 표기는 1/16″ 단위 반올림 값입니다. 정확한 값은 소수(in/ft)를 쓰세요.";
+          }
+          copyText = "수평거리 " + ftIn(run2) + ", 높이 " + toFrac16(rise2) +
+            " → 경사 " + fmt(inPerFt, 3) + " in/ft (" + fmt(rise2 / run2 * 100, 2) + "%)";
+        }
+      } else {
+        var run3 = num("spanMm");
+        var rise3 = num("riseMm");
+        runIn = run3 / 25.4; riseInVal = rise3 / 25.4;
+        if (run3 > 0 && rise3 >= 0) {
+          var pct3 = rise3 / run3 * 100;
+          big = fmt(pct3, 2) + ' <small>%</small>';
+          cells = [
+            ["비율로", rise3 > 0 ? "1/" + fmt(run3 / rise3, 1) : "0"],
+            ["경사 각도", fmt(Math.atan2(rise3, run3) * 180 / Math.PI, 2) + "°"],
+            ["인치/피트로", fmt(pct3 / 100 * 12, 3) + " in/ft"]
+          ];
+          copyText = "수평거리 " + fmt(run3, 0) + " mm, 높이 " + fmt(rise3, 1) +
+            " mm → 경사 " + fmt(pct3, 2) + "%";
+        }
+      }
+    }
+
+    $("bigResult").innerHTML = big;
+    $("subGrid").innerHTML = cells.map(function (c) {
+      return '<div class="cell"><div class="k">' + c[0] + '</div><div class="v">' + c[1] + '</div></div>';
+    }).join("");
+    var w = $("warn");
+    w.textContent = warn;
+    w.className = warn ? "warn show" : "warn";
+    lastCopyText = copyText;
+
+    drawTriangle(runIn, riseInVal);
+    renderTable();
+  }
+
+  // ── 삼각형 그림 ───────────────────────
+  function drawTriangle(runIn, riseIn) {
+    var svg = $("tri");
+    if (!(runIn > 0) || !(riseIn >= 0)) { svg.innerHTML = ""; return; }
+    var W = 640, H = 240, padL = 30, padR = 30, padB = 46, padT = 30;
+    var bw = W - padL - padR;
+    // 실제 비율은 거의 평평 → 높이를 시각적으로 과장하되 최소/최대 클램프
+    var visRise = Math.min(H - padT - padB, Math.max(40, (riseIn / runIn) * bw * 3));
+    if (riseIn === 0) visRise = 2;
+    var x0 = padL, y0 = H - padB;               // 왼쪽 아래 (낮은 쪽)
+    var x1 = padL + bw, y1 = y0;                // 오른쪽 아래
+    var yTop = y0 - visRise;                    // 오른쪽 위 (높은 쪽)
+
+    var runLabel = unit === "imp" ? ftIn(runIn) : fmt(runIn * 25.4, 0) + " mm";
+    var riseLabel = unit === "imp" ? toFrac16(riseIn) : fmt(riseIn * 25.4, 1) + " mm";
+    var angle = fmt(Math.atan2(riseIn, runIn) * 180 / Math.PI, 2);
+
+    svg.innerHTML =
+      '<polygon points="' + x0 + ',' + y0 + ' ' + x1 + ',' + y1 + ' ' + x1 + ',' + yTop + '"' +
+        ' fill="#FFD369" fill-opacity="0.35" stroke="none"/>' +
+      '<line x1="' + x0 + '" y1="' + y0 + '" x2="' + x1 + '" y2="' + y1 + '" stroke="#393E46" stroke-width="2"/>' +
+      '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x1 + '" y2="' + yTop + '" stroke="#393E46" stroke-width="2"/>' +
+      '<line x1="' + x0 + '" y1="' + y0 + '" x2="' + x1 + '" y2="' + yTop + '" stroke="#222831" stroke-width="3.5"/>' +
+      // 수평거리 라벨
+      '<text x="' + (x0 + bw / 2) + '" y="' + (y0 + 30) + '" text-anchor="middle" font-size="15"' +
+        ' font-weight="700" fill="#222831">수평거리 ' + runLabel + '</text>' +
+      // 높이 라벨
+      '<text x="' + (x1 - 10) + '" y="' + ((y1 + yTop) / 2) + '" text-anchor="end" font-size="15"' +
+        ' font-weight="700" fill="#222831">올릴 높이<tspan x="' + (x1 - 10) + '" dy="18">' + riseLabel + '</tspan></text>' +
+      // 각도 라벨
+      '<text x="' + (x0 + 46) + '" y="' + (y0 - 12) + '" font-size="13" fill="#393E46">' + angle + '°</text>';
+  }
+
+  // ── 빠른 참조표 ───────────────────────
+  function renderTable() {
+    var head, rows;
+    if (unit === "imp") {
+      var slope = getSlopeImp();
+      head = "<th>수평거리</th><th>올릴 높이 (분수)</th><th>올릴 높이 (소수 in)</th><th>mm</th>";
+      var spansFt = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
+      rows = spansFt.map(function (ft) {
+        var rise = ft * slope;
+        return "<tr><td>" + ft + "′</td><td>" + toFrac16(rise) + "</td><td>" +
+          fmt(rise, 2) + "</td><td>" + fmt(rise * 25.4, 1) + "</td></tr>";
+      }).join("");
+      $("tblNote").textContent = "현재 선택: " + slopeName() + " — 표는 경사도를 바꾸면 자동으로 갱신됩니다.";
+    } else {
+      var pct = getSlopeMet();
+      head = "<th>수평거리 (mm)</th><th>올릴 높이 (mm)</th><th>인치로</th>";
+      var spansMm = [1000, 2000, 3000, 5000, 6000, 8000, 10000, 15000, 20000, 30000];
+      rows = spansMm.map(function (mm) {
+        var rise = mm * pct / 100;
+        return "<tr><td>" + fmt(mm, 0) + "</td><td>" + fmt(rise, 1) + "</td><td>" +
+          toFrac16(rise / 25.4) + "</td></tr>";
+      }).join("");
+      $("tblNote").textContent = "현재 선택: " + fmt(pct, 3) + "% — 표는 경사도를 바꾸면 자동으로 갱신됩니다.";
+    }
+    $("tblHead").innerHTML = head;
+    $("tblBody").innerHTML = rows;
+  }
+
+  // ── 프리셋 칩 ─────────────────────────
+  function buildChips() {
+    var list = unit === "imp" ? PRESET_IMP : PRESET_MET;
+    var cur = unit === "imp" ? slopeInPerFt : slopePct;
+    var html = list.map(function (p) {
+      var on = (!customOn && p[0] === cur) ? " class='on'" : "";
+      return "<button type='button' data-v='" + p[0] + "'" + on + ">" + p[1] + "</button>";
+    }).join("");
+    html += "<button type='button' data-v='custom'" + (customOn ? " class='on'" : "") + ">직접 입력</button>";
+    $("chips").innerHTML = html;
+
+    Array.prototype.forEach.call($("chips").querySelectorAll("button"), function (btn) {
+      btn.addEventListener("click", function () {
+        if (btn.getAttribute("data-v") === "custom") {
+          customOn = true;
+        } else {
+          customOn = false;
+          if (unit === "imp") slopeInPerFt = parseFloat(btn.getAttribute("data-v"));
+          else slopePct = parseFloat(btn.getAttribute("data-v"));
+        }
+        $("customBox").className = customOn ? "custom-slope show" : "custom-slope";
+        buildChips();
+        render();
+      });
+    });
+
+    $("customBox").className = customOn ? "custom-slope show" : "custom-slope";
+    if (unit === "imp") {
+      $("customLabel").textContent = "직접 입력 (1피트당 인치)";
+      $("customSuffix").textContent = "in / ft";
+      $("customSlope").placeholder = "예: 0.5";
+      $("chipNote").innerHTML = "현재 프로젝트 기준은 <b>1/2″ / ft</b> 입니다. (1피트 갈 때마다 1/2인치씩 올라감)";
+    } else {
+      $("customLabel").textContent = "직접 입력 (%)";
+      $("customSuffix").textContent = "%";
+      $("customSlope").placeholder = "예: 2";
+      $("chipNote").innerHTML = "참고: 1/2″/ft ≒ <b>4.17%</b> 입니다.";
+    }
+  }
+
+  // ── 모드/단위 전환 ────────────────────
+  function setMode(m) {
+    mode = m;
+    $("tabA").className = m === "A" ? "on" : "";
+    $("tabB").className = m === "B" ? "on" : "";
+    $("slopeCard").className = m === "A" ? "card" : "card hidden";
+    $("riseWrap").className = m === "B" ? "" : "hidden";
+    $("stepNum").textContent = m === "A" ? "2" : "1";
+    $("inputTitle").textContent = m === "A" ? "수평거리 입력" : "수평거리와 높이 입력";
+    $("resultLabel").textContent = m === "A" ? "올려야 하는 높이" : "경사도";
+    render();
+  }
+
+  function setUnit(u) {
+    unit = u;
+    customOn = false;
+    if (u === "imp") { slopeInPerFt = DEFAULT_IMP; } else { slopePct = DEFAULT_MET; }
+    $("unitImp").className = u === "imp" ? "on" : "";
+    $("unitMet").className = u === "met" ? "on" : "";
+    $("unitHint").textContent = u === "imp" ? "미국 프로젝트 기준 (인치/피트)" : "국내 프로젝트 기준 (mm, %)";
+    $("spanImp").className = u === "imp" ? "fields" : "fields hidden";
+    $("spanMet").className = u === "met" ? "fields" : "fields hidden";
+    $("riseImp").className = u === "imp" ? "fields" : "fields hidden";
+    $("riseMet").className = u === "met" ? "fields" : "fields hidden";
+    buildChips();
+    render();
+  }
+
+  // ── 복사 ──────────────────────────────
+  $("copyBtn").addEventListener("click", function () {
+    if (!lastCopyText) return;
+    var done = function () {
+      $("copyBtn").textContent = "복사됨 ✓";
+      setTimeout(function () { $("copyBtn").textContent = "결과 복사"; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(lastCopyText).then(done, done);
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = lastCopyText;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      done();
+    }
+  });
+
+  // ── 이벤트 연결 ───────────────────────
+  $("tabA").addEventListener("click", function () { setMode("A"); });
+  $("tabB").addEventListener("click", function () { setMode("B"); });
+  $("unitImp").addEventListener("click", function () { setUnit("imp"); });
+  $("unitMet").addEventListener("click", function () { setUnit("met"); });
+  ["spanFt", "spanIn", "spanMm", "riseIn", "riseMm", "customSlope"].forEach(function (id) {
+    $(id).addEventListener("input", render);
+  });
+
+  buildChips();
+  render();
+})();
+</script>
+</body>
+</html>
